@@ -9,13 +9,7 @@
 <title>オクすけ - ヤフオク出品アシスタント</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-<script type="module">
-  // ZXing-js/browser をESモジュールで読み込み
-  import { BrowserMultiFormatReader, NotFoundException } from 'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm';
-  window._ZXingReader = BrowserMultiFormatReader;
-  window._ZXingNotFoundException = NotFoundException;
-  window.dispatchEvent(new Event('zxing-ready'));
-</script>
+<script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.2.6/dist/quagga.min.js"></script>
 <style>
   :root {
     --bg: #0a0a0f;
@@ -851,6 +845,7 @@
       <button class="btn btn-secondary" id="stopScanBtn" onclick="stopScanner()" style="display:none;margin-top:8px;">
         ⏹ スキャンを停止
       </button>
+      <div id="cameraErrorMsg" style="display:none;margin-top:10px;background:rgba(255,60,60,0.08);border:1px solid rgba(255,60,60,0.2);border-radius:10px;padding:10px 12px;font-size:12px;color:#ff8080;line-height:1.6;"></div>
 
       <div class="tip-box" style="margin-top:12px;font-size:11px;background:rgba(255,107,53,0.06);border-color:rgba(255,107,53,0.25);color:#ffb299;">
         <strong>⚠️ カメラが起動しない場合：</strong><br>
@@ -1162,115 +1157,107 @@ function updateBottomAction() {
 }
 
 // ============================
-// Scanner (ZXing-js)
+// Scanner (QuaggaJS2)
 // ============================
-let zxingReader = null;
-let videoStream = null;
-let scanAnimFrame = null;
+let scannerRunning = false;
 
 async function startScanner() {
-  // ZXingが未ロードなら待つ
-  if (!window._ZXingReader) {
-    showToast('スキャナーを読み込み中... もう一度タップしてください');
+  setCameraError('');
+
+  if (typeof Quagga === 'undefined') {
+    setCameraError('スキャナーライブラリの読み込みに失敗しました。ページを再読み込みしてください。');
     return;
   }
 
-  // カメラ権限チェック
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    showToast('このブラウザはカメラに対応していません。手動入力してください。');
+  if (!navigator.mediaDevices?.getUserMedia) {
+    setCameraError('このブラウザはカメラに対応していません。コードを手入力してください。');
     return;
   }
 
   document.getElementById('startScanBtn').style.display = 'none';
   document.getElementById('stopScanBtn').style.display = 'block';
+  document.getElementById('scannerPlaceholder').style.display = 'none';
+  document.getElementById('scannerOverlay').style.display = 'block';
 
-  try {
-    // まず既存ストリームをクリア
-    stopScanner();
-
-    // ビデオ要素を作成
-    let video = document.getElementById('scanVideo');
-    if (!video) {
-      video = document.createElement('video');
-      video.id = 'scanVideo';
-      video.setAttribute('playsinline', '');
-      video.setAttribute('autoplay', '');
-      video.setAttribute('muted', '');
-      video.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:10px;';
-      document.getElementById('interactive').innerHTML = '';
-      document.getElementById('interactive').appendChild(video);
+  Quagga.init({
+    inputStream: {
+      name: 'Live',
+      type: 'LiveStream',
+      target: document.getElementById('interactive'),
+      constraints: {
+        facingMode: 'environment',
+        width: { min: 640, ideal: 1280 },
+        height: { min: 480, ideal: 720 }
+      }
+    },
+    decoder: {
+      readers: [
+        'ean_reader',
+        'ean_8_reader',
+        'code_128_reader',
+        'upc_reader',
+        'upc_e_reader'
+      ]
+    },
+    locate: true,
+    numOfWorkers: 2,
+    frequency: 10
+  }, function(err) {
+    if (err) {
+      console.error('Quagga init error:', err);
+      let msg = 'カメラを起動できませんでした。';
+      if (err.name === 'NotAllowedError' || (err.message && err.message.includes('Permission'))) {
+        msg = 'カメラの使用を許可してください。Chromeのアドレスバー左の🔒をタップして「カメラ→許可」に変更してください。';
+      } else if (err.name === 'NotFoundError') {
+        msg = 'カメラが見つかりません。';
+      } else if (err.name === 'NotReadableError') {
+        msg = 'カメラが他のアプリで使用中です。他のアプリを閉じてから試してください。';
+      }
+      setCameraError(msg);
+      stopScanner();
+      return;
     }
-
-    // カメラストリーム取得（背面優先）
-    const constraints = {
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      }
-    };
-
-    videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-    video.srcObject = videoStream;
-    await video.play();
-
-    document.getElementById('scannerPlaceholder').style.display = 'none';
-    document.getElementById('scannerOverlay').style.display = 'block';
+    Quagga.start();
     scannerRunning = true;
+  });
 
-    // ZXingでデコード
-    zxingReader = new window._ZXingReader();
-    const hints = new Map();
-    // 対応フォーマット
-    hints.set(2, [1,2,3,4,6,8,11,12,13,14,15,16,17]); // BarcodeFormat hints
-
-    // デコードループ
-    zxingReader.decodeFromVideoElement(video, (result, err) => {
-      if (result) {
-        const code = result.getText();
-        if (code && code.length >= 8) {
-          document.getElementById('janInput').value = code;
-          scannedJan = code;
-          showToast('✅ スキャン成功: ' + code);
-          stopScanner();
-          fetchProductInfo(code);
-          goStep(2);
-        }
+  Quagga.onDetected(function(result) {
+    const code = result?.codeResult?.code;
+    if (code && code.length >= 8) {
+      // 誤検知防止：同じコードが2回連続で検出されたら確定
+      if (Quagga._lastCode === code) {
+        document.getElementById('janInput').value = code;
+        scannedJan = code;
+        showToast('✅ スキャン成功: ' + code);
+        stopScanner();
+        fetchProductInfo(code);
+        goStep(2);
       }
-    }).catch(e => {
-      // decodeFromVideoElementのpromise rejectは無視（stopで発生する正常終了）
-    });
+      Quagga._lastCode = code;
+    }
+  });
+}
 
-  } catch(err) {
-    console.error('Camera error:', err);
-    let msg = 'カメラを起動できませんでした。';
-    if (err.name === 'NotAllowedError') msg = 'カメラの許可が必要です。ブラウザの設定からカメラを許可してください。';
-    else if (err.name === 'NotFoundError') msg = 'カメラが見つかりません。手動入力をご利用ください。';
-    else if (err.name === 'NotReadableError') msg = 'カメラが他のアプリで使用中です。';
-    showToast(msg);
-    stopScanner();
-  }
+function setCameraError(msg) {
+  const el = document.getElementById('cameraErrorMsg');
+  if (el) { el.textContent = msg; el.style.display = msg ? 'block' : 'none'; }
 }
 
 function stopScanner() {
-  // ZXingを停止
-  if (zxingReader) {
-    try { zxingReader.reset(); } catch(e) {}
-    zxingReader = null;
+  if (typeof Quagga !== 'undefined') {
+    try { Quagga.stop(); } catch(e) {}
   }
-  // ビデオストリームを停止
-  if (videoStream) {
-    videoStream.getTracks().forEach(t => t.stop());
-    videoStream = null;
-  }
-  const video = document.getElementById('scanVideo');
-  if (video) { video.srcObject = null; }
-
   scannerRunning = false;
-  document.getElementById('scannerPlaceholder').style.display = 'flex';
-  document.getElementById('scannerOverlay').style.display = 'none';
-  document.getElementById('startScanBtn').style.display = 'block';
-  document.getElementById('stopScanBtn').style.display = 'none';
+  const placeholder = document.getElementById('scannerPlaceholder');
+  const overlay = document.getElementById('scannerOverlay');
+  const startBtn = document.getElementById('startScanBtn');
+  const stopBtn = document.getElementById('stopScanBtn');
+  const interactive = document.getElementById('interactive');
+  if (placeholder) placeholder.style.display = 'flex';
+  if (overlay) overlay.style.display = 'none';
+  if (startBtn) startBtn.style.display = 'block';
+  if (stopBtn) stopBtn.style.display = 'none';
+  if (interactive) interactive.innerHTML = '';
 }
 
 // ============================
