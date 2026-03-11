@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0f">
+<title>オクすけ - ヤフオク出品アシスタント</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.2.6/dist/quagga.min.js"></script>
+<style>
+:root {
+  --bg:#0a0a0f; --bg2:#12121a; --bg3:#1a1a26;
+  --accent:#00e5ff; --accent2:#ff6b35; --accent3:#7c3aed;
+  --text:#e8e8f0; --dim:#7070a0; --success:#00ff88;
+  --border:rgba(0,229,255,0.15);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Zen Kaku Gothic New',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:80px;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+.wrap{position:relative;z-index:1;max-width:480px;margin:0 auto;padding:0 14px;}
+header{background:rgba(10,10,15,0.97);border-bottom:1px solid var(--border);padding:12px 16px;position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;}
+.logo{font-size:21px;font-weight:900;background:linear-gradient(135deg,var(--accent),var(--accent3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.logo-sub{font-size:10px;color:var(--dim);margin-top:1px;}
+.settings-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:17px;}
+.steps{display:flex;padding:12px 0 4px;gap:4px;}
+.step{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;opacity:0.3;transition:opacity 0.2s;}
+.step.active{opacity:1;}
+.step.done{opacity:0.6;}
+.step-num{width:26px;height:26px;border-radius:50%;border:2px solid #555;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;transition:all 0.3s;}
+.step.active .step-num{border-color:var(--accent);color:var(--accent);background:rgba(0,229,255,0.1);box-shadow:0 0 10px rgba(0,229,255,0.3);}
+.step.done .step-num{border-color:var(--success);color:var(--success);background:rgba(0,255,136,0.08);}
+.step-label{font-size:9px;color:var(--dim);white-space:nowrap;}
+.step.active .step-label{color:var(--accent);}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px;}
+.card-title{font-size:11px;font-weight:700;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+.card-title::before{content:'';width:3px;height:12px;background:var(--accent);border-radius:2px;box-shadow:0 0 6px rgba(0,229,255,0.5);flex-shrink:0;}
+.scanner-box{position:relative;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:4/3;border:2px solid var(--border);margin-bottom:12px;}
+#interactive{width:100%;height:100%;}
+#interactive video{width:100%!important;height:100%!important;object-fit:cover;}
+#interactive canvas{display:none!important;}
+.scan-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:var(--bg3);}
+.scan-ph-icon{font-size:44px;opacity:0.3;}
+.scan-ph-text{font-size:12px;color:var(--dim);text-align:center;}
+.scan-overlay{position:absolute;inset:0;pointer-events:none;display:none;}
+.scan-frame{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:72%;height:44%;border:2px solid rgba(0,229,255,0.8);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,0.45);}
+.scan-line{position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:scanline 2s linear infinite;box-shadow:0 0 8px var(--accent);}
+@keyframes scanline{0%{top:0}100%{top:100%}}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:13px 18px;border-radius:12px;border:none;font-family:'Zen Kaku Gothic New',sans-serif;font-size:15px;font-weight:700;cursor:pointer;width:100%;transition:opacity 0.15s;}
+.btn:active{opacity:0.8;}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#00b4d8);color:#000;}
+.btn-secondary{background:var(--bg3);color:var(--text);border:1px solid var(--border);}
+.btn-orange{background:linear-gradient(135deg,var(--accent2),#ff4500);color:#fff;}
+.btn-sm{padding:8px 14px;font-size:12px;border-radius:8px;width:auto;}
+.btn+.btn{margin-top:8px;}
+.form-group{margin-bottom:12px;}
+.form-label{font-size:11px;color:var(--dim);display:block;margin-bottom:5px;font-family:'Share Tech Mono',monospace;}
+.form-input,.form-textarea,.form-select{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--text);font-family:'Zen Kaku Gothic New',sans-serif;font-size:15px;outline:none;transition:border-color 0.2s;}
+.form-input:focus,.form-textarea:focus,.form-select:focus{border-color:var(--accent);}
+.form-textarea{resize:vertical;min-height:130px;line-height:1.7;}
+.form-select{-webkit-appearance:none;}
+.char-count{text-align:right;font-size:11px;color:var(--dim);margin-top:3px;font-family:'Share Tech Mono',monospace;}
+.status{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;font-size:13px;margin-bottom:12px;}
+.status-loading{background:rgba(0,229,255,0.06);border:1px solid rgba(0,229,255,0.2);color:var(--accent);}
+.status-error{background:rgba(255,60,60,0.08);border:1px solid rgba(255,60,60,0.2);color:#ff8080;}
+.status-success{background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.2);color:var(--success);}
+.spinner{width:16px;height:16px;border:2px solid rgba(0,229,255,0.2);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.product-card{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px;animation:fadeIn 0.3s ease-out;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.product-img{width:76px;height:76px;border-radius:8px;object-fit:contain;background:#fff;flex-shrink:0;border:1px solid var(--border);}
+.product-img-ph{width:76px;height:76px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;}
+.product-name{font-size:13px;font-weight:700;line-height:1.4;margin-bottom:7px;}
+.badges{display:flex;flex-wrap:wrap;gap:5px;}
+.badge{font-size:11px;padding:2px 8px;border-radius:20px;font-family:'Share Tech Mono',monospace;}
+.badge-price{background:rgba(255,107,53,0.1);color:#ff9966;border:1px solid rgba(255,107,53,0.25);}
+.badge-code{background:rgba(0,229,255,0.08);color:var(--accent);border:1px solid rgba(0,229,255,0.2);}
+.badge-src{background:rgba(124,58,237,0.1);color:#a78bfa;border:1px solid rgba(124,58,237,0.25);}
+.cond-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+.cond-item{background:var(--bg3);border:2px solid transparent;border-radius:10px;padding:10px 11px;cursor:pointer;transition:all 0.2s;}
+.cond-item.selected{border-color:var(--accent);background:rgba(0,229,255,0.06);}
+.cond-name{font-size:13px;font-weight:700;}
+.cond-desc{font-size:11px;color:var(--dim);margin-top:2px;}
+.price-chips{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;}
+.price-chip{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 6px;text-align:center;cursor:pointer;}
+.price-chip:active{border-color:var(--accent);}
+.price-chip-label{font-size:10px;color:var(--dim);}
+.price-chip-val{font-size:14px;font-weight:700;color:var(--accent);font-family:'Share Tech Mono',monospace;}
+.preview-box{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;}
+.preview-title{font-size:15px;font-weight:700;line-height:1.4;margin-bottom:10px;}
+.preview-desc{font-size:12px;color:var(--dim);line-height:1.7;white-space:pre-line;max-height:120px;overflow-y:auto;}
+.preview-prices{display:flex;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
+.preview-price-val{font-size:22px;font-weight:900;color:var(--accent2);font-family:'Share Tech Mono',monospace;}
+.preview-buynow-val{font-size:18px;font-weight:700;color:var(--accent);font-family:'Share Tech Mono',monospace;}
+.copy-row{display:flex;gap:8px;margin-bottom:10px;}
+.copy-box{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--text);word-break:break-all;line-height:1.5;max-height:70px;overflow-y:auto;}
+.tip{background:rgba(255,107,53,0.06);border:1px solid rgba(255,107,53,0.2);border-radius:10px;padding:10px 12px;font-size:11px;color:#ffb299;line-height:1.7;margin-bottom:12px;}
+.tip strong{color:var(--accent2);}
+.divider{display:flex;align-items:center;gap:10px;margin:4px 0 12px;color:var(--dim);font-size:12px;}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border);}
+.panel{display:none;padding:12px 0;}
+.panel.active{display:block;}
+.bottom-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(10,10,15,0.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:10px 16px;z-index:100;}
+#toast{position:fixed;bottom:82px;left:50%;transform:translateX(-50%) translateY(10px);background:rgba(0,229,255,0.12);border:1px solid var(--accent);border-radius:100px;padding:9px 20px;font-size:12px;color:var(--accent);white-space:nowrap;opacity:0;transition:all 0.25s;z-index:9999;pointer-events:none;font-family:'Share Tech Mono',monospace;}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;display:none;backdrop-filter:blur(4px);}
+.modal-bg.open{display:block;}
+.modal{position:absolute;bottom:0;left:0;right:0;background:var(--bg2);border-radius:22px 22px 0 0;padding:22px 18px 40px;border-top:1px solid var(--border);max-height:90vh;overflow-y:auto;animation:slideUp 0.3s ease-out;}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-handle{width:38px;height:4px;background:var(--dim);border-radius:2px;margin:0 auto 18px;opacity:0.3;}
+.modal-title{font-size:17px;font-weight:900;margin-bottom:18px;}
+.config-box{background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.2);border-radius:12px;padding:14px;margin-bottom:14px;}
+.config-title{font-size:11px;font-weight:700;color:#a78bfa;letter-spacing:1px;text-transform:uppercase;font-family:'Share Tech Mono',monospace;margin-bottom:12px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">オクすけ</div>
+    <div class="logo-sub">Amazon返品→ヤフオク出品アシスタント</div>
+  </div>
+  <button class="settings-btn" onclick="openSettings()">⚙️</button>
+</header>
+
+<div class="wrap">
+  <div class="steps">
+    <div class="step active" id="step0"><div class="step-num">1</div><div class="step-label">スキャン</div></div>
+    <div class="step" id="step1"><div class="step-num">2</div><div class="step-label">商品確認</div></div>
+    <div class="step" id="step2"><div class="step-num">3</div><div class="step-label">出品設定</div></div>
+    <div class="step" id="step3"><div class="step-num">4</div><div class="step-label">出品する</div></div>
+  </div>
+
+  <!-- PANEL 0 -->
+  <div class="panel active" id="panel0">
+    <div class="card">
+      <div class="card-title">📷 カメラでスキャン</div>
+      <div class="scanner-box">
+        <div class="scan-placeholder" id="scanPlaceholder">
+          <div class="scan-ph-icon">📷</div>
+          <div class="scan-ph-text">カメラを起動してバーコードをスキャン</div>
+        </div>
+        <div id="interactive"></div>
+        <div class="scan-overlay" id="scanOverlay">
+          <div class="scan-frame"><div class="scan-line"></div></div>
+        </div>
+      </div>
+      <div id="camError" class="status status-error" style="display:none;"></div>
+      <button class="btn btn-primary" id="startScanBtn" onclick="startScanner()">📷 カメラを起動</button>
+      <button class="btn btn-secondary" id="stopScanBtn" onclick="stopScanner()" style="display:none;">⏹ スキャンを停止</button>
+    </div>
+
+    <div class="divider">または手動入力</div>
+
+    <div class="card">
+      <div class="card-title">コードを入力（ASIN / JANコード）</div>
+      <div class="tip">
+        <strong>📌 ASINコードとは？</strong><br>
+        商品ラベルのバーコード下の英数字10桁（例: X001B99PDH）<br>
+        JANコード（数字13桁）も対応しています。
+      </div>
+      <div class="form-group">
+        <input class="form-input" id="codeInput" type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="例: X001B99PDH または 4901777043596">
+      </div>
+      <button class="btn btn-primary" onclick="doSearch()">🔍 検索する</button>
+    </div>
+  </div>
+
+  <!-- PANEL 1 -->
+  <div class="panel" id="panel1">
+    <button class="btn btn-secondary" style="margin-bottom:12px;" onclick="goPanel(0)">← 戻る</button>
+    <div id="searchStatus"></div>
+    <div id="productDisplay"></div>
+    <div class="card" id="editCard" style="display:none;">
+      <div class="card-title">商品名を確認・編集</div>
+      <div class="form-group">
+        <label class="form-label">タイトル（最大65文字）</label>
+        <input class="form-input" id="editTitle" type="text" maxlength="65" oninput="document.getElementById('titleCount').textContent=this.value.length">
+        <div class="char-count"><span id="titleCount">0</span>/65</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">ブランド / メーカー</label>
+        <input class="form-input" id="editBrand" type="text" placeholder="例: ソニー、パナソニック">
+      </div>
+    </div>
+  </div>
+
+  <!-- PANEL 2 -->
+  <div class="panel" id="panel2">
+    <button class="btn btn-secondary" style="margin-bottom:12px;" onclick="goPanel(1)">← 戻る</button>
+    <div class="card">
+      <div class="card-title">コンディション</div>
+      <div class="cond-grid">
+        <div class="cond-item selected" onclick="selectCond(this,'未使用品')"><div class="cond-name">🌟 未使用品</div><div class="cond-desc">開封未使用</div></div>
+        <div class="cond-item" onclick="selectCond(this,'未使用に近い')"><div class="cond-name">✨ 未使用に近い</div><div class="cond-desc">ほぼ使用なし</div></div>
+        <div class="cond-item" onclick="selectCond(this,'目立った傷や汚れなし')"><div class="cond-name">👍 目立つ傷なし</div><div class="cond-desc">軽微な使用感</div></div>
+        <div class="cond-item" onclick="selectCond(this,'やや傷や汚れあり')"><div class="cond-name">📦 やや傷あり</div><div class="cond-desc">使用感あり</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">価格設定</div>
+      <div class="price-chips" id="priceChips"></div>
+      <div class="form-group">
+        <label class="form-label">開始価格（円）</label>
+        <input class="form-input" id="startPrice" type="number" placeholder="例: 3000">
+      </div>
+      <div class="form-group">
+        <label class="form-label">即決価格（円）※空白でなし</label>
+        <input class="form-input" id="buyNowPrice" type="number" placeholder="例: 5000">
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">商品説明文</div>
+      <textarea class="form-textarea" id="descText"></textarea>
+      <button class="btn btn-secondary btn-sm" style="width:auto;margin-top:8px;" onclick="genDesc()">✨ 説明文を再生成</button>
+    </div>
+    <div class="card">
+      <div class="card-title">配送設定</div>
+      <div class="form-group">
+        <label class="form-label">配送方法</label>
+        <select class="form-select" id="shippingMethod">
+          <option>ヤフネコ!パック（ネコポス）</option>
+          <option selected>ヤフネコ!パック（宅急便）</option>
+          <option>おてがる版ゆうパック</option>
+          <option>クロネコヤマト</option>
+          <option>日本郵便</option>
+          <option>その他</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">送料負担</label>
+        <select class="form-select" id="shippingPayer">
+          <option value="出品者">出品者負担（送料込み）</option>
+          <option value="落札者">落札者負担（着払い）</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="goPanel(3);buildPreview();">次へ：プレビュー確認 →</button>
+  </div>
+
+  <!-- PANEL 3 -->
+  <div class="panel" id="panel3">
+    <button class="btn btn-secondary" style="margin-bottom:12px;" onclick="goPanel(2)">← 戻る</button>
+    <div class="card">
+      <div class="card-title">出品内容プレビュー</div>
+      <div class="preview-box">
+        <div class="preview-title" id="prevTitle"></div>
+        <div class="preview-desc" id="prevDesc"></div>
+        <div class="preview-prices">
+          <div>
+            <div style="font-size:10px;color:var(--dim);margin-bottom:2px;">開始価格</div>
+            <div class="preview-price-val" id="prevPrice"></div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:10px;color:var(--dim);margin-bottom:2px;">即決価格</div>
+            <div class="preview-buynow-val" id="prevBuyNow"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">コピーして出品</div>
+      <div class="tip">① 各項目を「コピー」→ ② 「ヤフオクで出品」タップ → ③ フォームに貼り付け</div>
+      <div class="form-group">
+        <label class="form-label">タイトル</label>
+        <div class="copy-row">
+          <div class="copy-box" id="copyTitle"></div>
+          <button class="btn btn-secondary btn-sm" onclick="copyEl('copyTitle')">コピー</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">説明文</label>
+        <div class="copy-row">
+          <div class="copy-box" id="copyDesc"></div>
+          <button class="btn btn-secondary btn-sm" onclick="copyEl('copyDesc')">コピー</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+        <div>
+          <label class="form-label">開始価格</label>
+          <div class="copy-box" id="copyPrice" style="font-size:18px;font-weight:700;color:var(--accent2);text-align:center;max-height:none;cursor:pointer;" onclick="copyEl('copyPrice')"></div>
+        </div>
+        <div>
+          <label class="form-label">即決価格</label>
+          <div class="copy-box" id="copyBuyNow" style="font-size:18px;font-weight:700;color:var(--accent);text-align:center;max-height:none;cursor:pointer;" onclick="copyEl('copyBuyNow')"></div>
+        </div>
+      </div>
+      <button class="btn btn-orange" onclick="openYahoo()">🛒 ヤフオクで出品する</button>
+      <button class="btn btn-secondary" onclick="resetAll()">🔄 別の商品を出品する</button>
+    </div>
+  </div>
+</div>
+
+<div class="bottom-bar"><div id="bottomBtn"></div></div>
+<div id="toast"></div>
+
+<div class="modal-bg" id="settingsModal" onclick="if(event.target===this)closeSettings()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">⚙️ API設定</div>
+    <div class="config-box">
+      <div class="config-title">Amazon PA-API 5.0（取得後に入力）</div>
+      <div class="form-group"><label class="form-label">ACCESS KEY</label><input class="form-input" id="amzKey" type="text" placeholder="AKIA..."></div>
+      <div class="form-group"><label class="form-label">SECRET KEY</label><input class="form-input" id="amzSecret" type="password" placeholder="••••••••"></div>
+      <div class="form-group"><label class="form-label">PARTNER TAG</label><input class="form-input" id="amzTag" type="text" placeholder="yourname-22"></div>
+    </div>
+    <div class="tip">キーはこのデバイスのみに保存されます。</div>
+    <button class="btn btn-primary" onclick="saveSettings()">💾 設定を保存</button>
+    <button class="btn btn-secondary" onclick="closeSettings()">キャンセル</button>
+  </div>
+</div>
+
+<script>
+var currentPanel = 0;
+var scannedCode = '';
+var productData = {};
+var selectedCond = '未使用品';
+var isScanning = false;
+var lastDetected = '';
+
+function goPanel(n) {
+  document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+  document.getElementById('panel' + n).classList.add('active');
+  document.querySelectorAll('.step').forEach(function(s, i){
+    s.classList.remove('active','done');
+    if (i < n) s.classList.add('done');
+    if (i === n) s.classList.add('active');
+    s.querySelector('.step-num').textContent = i < n ? '✓' : (i+1);
+  });
+  currentPanel = n;
+  updateBottomBtn();
+  window.scrollTo({top:0,behavior:'smooth'});
+  if (isScanning && n !== 0) stopScanner();
+}
+
+function updateBottomBtn() {
+  var el = document.getElementById('bottomBtn');
+  if (currentPanel === 0) el.innerHTML = '<button class="btn btn-primary" onclick="doSearch()">🔍 コードで検索</button>';
+  else if (currentPanel === 1) el.innerHTML = '<button class="btn btn-primary" onclick="toStep2()">次へ：出品設定 →</button>';
+  else if (currentPanel === 2) el.innerHTML = '<button class="btn btn-primary" onclick="goPanel(3);buildPreview();">次へ：プレビュー確認 →</button>';
+  else if (currentPanel === 3) el.innerHTML = '<button class="btn btn-orange" onclick="openYahoo()">🛒 ヤフオクで出品する</button>';
+}
+
+function toStep2() {
+  var t = document.getElementById('editTitle').value.trim();
+  if (!t) { showToast('タイトルを入力してください'); return; }
+  goPanel(2);
+  updatePriceChips();
+  genDesc();
+}
+
+function startScanner() {
+  document.getElementById('camError').style.display = 'none';
+  if (typeof Quagga === 'undefined') {
+    showCamError('スキャナーライブラリが読み込まれていません。ページを再読み込みしてください。');
+    return;
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showCamError('このブラウザはカメラに対応していません。コードを手入力してください。');
+    return;
+  }
+  document.getElementById('startScanBtn').style.display = 'none';
+  document.getElementById('stopScanBtn').style.display = 'flex';
+  document.getElementById('scanPlaceholder').style.display = 'none';
+  document.getElementById('scanOverlay').style.display = 'block';
+  lastDetected = '';
+
+  Quagga.init({
+    inputStream: {
+      name: 'Live', type: 'LiveStream',
+      target: document.getElementById('interactive'),
+      constraints: { facingMode: 'environment', width: {ideal:1280}, height: {ideal:720} }
+    },
+    decoder: { readers: ['ean_reader','ean_8_reader','code_128_reader','upc_reader'] },
+    locate: true, numOfWorkers: 2, frequency: 10
+  }, function(err) {
+    if (err) {
+      var msg = 'カメラを起動できませんでした。';
+      if (err.name === 'NotAllowedError' || String(err).includes('Permission')) {
+        msg = 'カメラの許可が必要です。Chromeのアドレスバー左の🔒をタップ→「カメラ」→「許可」に変更してください。';
+      } else if (err.name === 'NotFoundError') {
+        msg = 'カメラが見つかりません。';
+      } else if (err.name === 'NotReadableError') {
+        msg = 'カメラが他のアプリで使用中です。';
+      }
+      showCamError(msg);
+      stopScanner();
+      return;
+    }
+    Quagga.start();
+    isScanning = true;
+  });
+
+  Quagga.onDetected(function(result) {
+    var code = result && result.codeResult && result.codeResult.code;
+    if (code && code.length >= 8) {
+      if (code === lastDetected) {
+        stopScanner();
+        document.getElementById('codeInput').value = code;
+        scannedCode = code;
+        showToast('✅ スキャン成功: ' + code);
+        doSearch(code);
+      }
+      lastDetected = code;
+    }
+  });
+}
+
+function stopScanner() {
+  if (typeof Quagga !== 'undefined') { try { Quagga.stop(); } catch(e) {} }
+  isScanning = false;
+  document.getElementById('interactive').innerHTML = '';
+  document.getElementById('startScanBtn').style.display = 'flex';
+  document.getElementById('stopScanBtn').style.display = 'none';
+  document.getElementById('scanPlaceholder').style.display = 'flex';
+  document.getElementById('scanOverlay').style.display = 'none';
+}
+
+function showCamError(msg) {
+  var el = document.getElementById('camError');
+  el.textContent = msg;
+  el.style.display = 'flex';
+}
+
+function doSearch(forceCode) {
+  var code = (forceCode || document.getElementById('codeInput').value).trim();
+  if (!code) { showToast('コードを入力してください'); return; }
+  scannedCode = code;
+  goPanel(1);
+  document.getElementById('searchStatus').innerHTML = '<div class="status status-loading"><div class="spinner"></div>「' + code + '」で検索中...</div>';
+  document.getElementById('productDisplay').innerHTML = '';
+  document.getElementById('editCard').style.display = 'none';
+
+  var isAsin = /^[A-Z0-9]{10}$/i.test(code);
+  var p = isAsin ? searchAsin(code.toUpperCase()) : searchJan(code);
+  p.then(function(found) {
+    if (found) {
+      document.getElementById('searchStatus').innerHTML = '<div class="status status-success">✅ 商品情報を取得しました（' + productData.source + '）</div>';
+      renderProduct();
+    } else {
+      document.getElementById('searchStatus').innerHTML = '<div class="status status-error">⚠️ 自動取得できませんでした。商品名を手動で入力してください。</div>';
+      productData = {title:'',brand:'',price:0,imageUrl:'',code:code,source:'manual'};
+    }
+    document.getElementById('editTitle').value = productData.title || '';
+    document.getElementById('editBrand').value = productData.brand || '';
+    document.getElementById('titleCount').textContent = (productData.title || '').length;
+    document.getElementById('editCard').style.display = 'block';
+  }).catch(function(){ 
+    document.getElementById('searchStatus').innerHTML = '<div class="status status-error">⚠️ エラーが発生しました。手動で入力してください。</div>';
+    productData = {title:'',brand:'',price:0,imageUrl:'',code:code,source:'manual'};
+    document.getElementById('editCard').style.display = 'block';
+  });
+}
+
+function searchAsin(asin) {
+  var url = 'https://api.allorigins.win/get?url=' + encodeURIComponent('https://www.amazon.co.jp/dp/' + asin);
+  return fetch(url, {signal: AbortSignal.timeout(12000)})
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      var html = data.contents || '';
+      var title = (html.match(/property="og:title"[^>]+content="([^"]+)"/) || html.match(/content="([^"]+)"[^>]+property="og:title"/) || [])[1]
+        || ((html.match(/<title>([^<]+)<\/title>/) || [])[1] || '').replace(/Amazon\.co\.jp.*$/i,'').trim();
+      var image = ((html.match(/property="og:image"[^>]+content="([^"]+)"/) || html.match(/content="([^"]+)"[^>]+property="og:image"/) || [])[1]) || '';
+      var price = 0;
+      [{p:/"priceAmount":([\d.]+)/},{p:/class="a-price-whole"[^>]*>([\d,]+)/},{p:/¥([\d,]+)/}].forEach(function(o){
+        if (!price) { var m = html.match(o.p); if (m) { var v = parseInt(m[1].replace(/,/g,'')); if (v > 100) price = v; } }
+      });
+      if (title && title.length > 3) {
+        productData = {title:title.trim(),brand:'',price:price,imageUrl:image,code:asin,asin:asin,source:'Amazon.co.jp'};
+        return true;
+      }
+      return false;
+    }).catch(function(){ return false; });
+}
+
+function searchJan(jan) {
+  return fetch('https://api.upcitemdb.com/prod/trial/lookup?upc=' + jan, {signal: AbortSignal.timeout(8000)})
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      if (data.items && data.items[0]) {
+        var item = data.items[0];
+        productData = {title:item.title||'',brand:item.brand||'',price:(item.offers&&item.offers[0]?item.offers[0].price:0),imageUrl:(item.images&&item.images[0]?item.images[0]:''),code:jan,source:'UPC Item DB'};
+        return true;
+      }
+      return false;
+    }).catch(function(){ return false; });
+}
+
+function renderProduct() {
+  var p = productData;
+  var img = p.imageUrl
+    ? '<img class="product-img" src="'+p.imageUrl+'" alt="" onerror="this.style.display=\'none\'">'
+    : '<div class="product-img-ph">📦</div>';
+  document.getElementById('productDisplay').innerHTML =
+    '<div class="product-card">'+img+'<div>'+
+    '<div class="product-name">'+(p.title||'（タイトルを入力してください）')+'</div>'+
+    '<div class="badges">'+
+    '<span class="badge badge-code">'+(p.asin?'ASIN: '+p.asin:'JAN: '+p.code)+'</span>'+
+    '<span class="badge badge-price">'+(p.price?'¥'+p.price.toLocaleString():'価格不明')+'</span>'+
+    (p.source!=='manual'?'<span class="badge badge-src">'+p.source+'</span>':'')+
+    '</div></div></div>';
+}
+
+function selectCond(el, val) {
+  document.querySelectorAll('.cond-item').forEach(function(i){ i.classList.remove('selected'); });
+  el.classList.add('selected');
+  selectedCond = val;
+  genDesc();
+}
+
+function updatePriceChips() {
+  var base = productData.price || 0;
+  var chips = document.getElementById('priceChips');
+  if (!base) { chips.innerHTML = ''; return; }
+  chips.innerHTML = [
+    {label:'60%目安', val:Math.round(base*0.6/100)*100},
+    {label:'70%中古', val:Math.round(base*0.7/100)*100},
+    {label:'80%美品', val:Math.round(base*0.8/100)*100}
+  ].map(function(c){
+    return '<div class="price-chip" onclick="document.getElementById(\'startPrice\').value='+c.val+';document.getElementById(\'buyNowPrice\').value='+Math.round(c.val*1.3/100)*100+'">'+
+      '<div class="price-chip-label">'+c.label+'</div>'+
+      '<div class="price-chip-val">¥'+c.val.toLocaleString()+'</div></div>';
+  }).join('');
+}
+
+function genDesc() {
+  var title = document.getElementById('editTitle').value || productData.title || '商品';
+  var brand = document.getElementById('editBrand').value || productData.brand || '';
+  document.getElementById('descText').value =
+    '【商品説明】\n'+title+'を出品します。\n\n'+
+    '【商品状態】\n'+selectedCond+'\n\n'+
+    'Amazonの返品・アウトレット品です。\n\n'+
+    '【商品詳細】\n'+(brand?'ブランド：'+brand+'\n':'')+'コード：'+scannedCode+'\n\n'+
+    '【発送について】\n・入金確認後、2〜3日以内に発送します\n・丁寧に梱包してお送りします\n\n'+
+    '【その他】\n・ノークレーム・ノーリターンでお願いします\n・即決大歓迎です\n・ご不明点はお気軽にご質問ください';
+}
+
+function buildPreview() {
+  var title = document.getElementById('editTitle').value;
+  var desc = document.getElementById('descText').value;
+  var price = parseInt(document.getElementById('startPrice').value||0);
+  var buyNow = parseInt(document.getElementById('buyNowPrice').value||0);
+  document.getElementById('prevTitle').textContent = title;
+  document.getElementById('prevDesc').textContent = desc;
+  document.getElementById('prevPrice').textContent = price ? '¥'+price.toLocaleString() : '¥-';
+  document.getElementById('prevBuyNow').textContent = buyNow ? '¥'+buyNow.toLocaleString() : 'なし';
+  document.getElementById('copyTitle').textContent = title;
+  document.getElementById('copyDesc').textContent = desc;
+  document.getElementById('copyPrice').textContent = price ? '¥'+price.toLocaleString() : '-';
+  document.getElementById('copyBuyNow').textContent = buyNow ? '¥'+buyNow.toLocaleString() : 'なし';
+}
+
+function copyEl(id) {
+  var text = document.getElementById(id).textContent;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function(){ showToast('✅ コピーしました'); }).catch(function(){ fallbackCopy(text); });
+  } else fallbackCopy(text);
+}
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text; ta.style.cssText = 'position:fixed;opacity:0;';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try { document.execCommand('copy'); showToast('✅ コピーしました'); } catch(e) { showToast('手動でコピーしてください'); }
+  document.body.removeChild(ta);
+}
+
+function openYahoo() {
+  var title = encodeURIComponent(document.getElementById('editTitle').value||'');
+  window.open('https://auctions.yahoo.co.jp/sell/jp/show/beform?subject='+title,'_blank');
+  showToast('ヤフオクの出品フォームを開きました');
+}
+
+function resetAll() {
+  scannedCode=''; productData={}; selectedCond='未使用品';
+  document.getElementById('codeInput').value='';
+  document.getElementById('searchStatus').innerHTML='';
+  document.getElementById('productDisplay').innerHTML='';
+  document.getElementById('editCard').style.display='none';
+  document.querySelectorAll('.cond-item').forEach(function(el,i){ el.classList.toggle('selected',i===0); });
+  goPanel(0);
+}
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2500);
+}
+
+function openSettings() {
+  document.getElementById('settingsModal').classList.add('open');
+  document.getElementById('amzKey').value = localStorage.getItem('amz_key')||'';
+  document.getElementById('amzSecret').value = localStorage.getItem('amz_secret')||'';
+  document.getElementById('amzTag').value = localStorage.getItem('amz_tag')||'';
+}
+function closeSettings() { document.getElementById('settingsModal').classList.remove('open'); }
+function saveSettings() {
+  localStorage.setItem('amz_key', document.getElementById('amzKey').value);
+  localStorage.setItem('amz_secret', document.getElementById('amzSecret').value);
+  localStorage.setItem('amz_tag', document.getElementById('amzTag').value);
+  closeSettings(); showToast('✅ 設定を保存しました');
+}
+
+updateBottomBtn();
+</script>
+</body>
+</html>
